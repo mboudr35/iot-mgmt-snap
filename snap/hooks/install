@@ -1,0 +1,26 @@
+#!/bin/sh
+
+mkdir -p \
+  $SNAP_COMMON/lib/mosquitto \
+  $SNAP_DATA/etc/mosquitto \
+  $SNAP_COMMON/log/mosquitto \
+  /run/mosquitto \
+  $SNAP_COMMON/srv/config \
+  $SNAP_COMMON/srv/certs
+  
+cp -r $SNAP/etc/mosquitto $SNAP_DATA/etc/
+cp -r $SNAP/static $SNAP_DATA/static
+
+cd $SNAP_COMMON/srv/certs
+
+$SNAP/bin/gencerts.sh
+
+cp devicetwin.crt server.crt
+cp devicetwin.key server.key
+
+cat > $SNAP_DATA/etc/mosquitto/conf.d/20-certs.conf <<EOF
+cafile $SNAP_COMMON/srv/certs/ca.crt
+keyfile $SNAP_COMMON/srv/certs/mqtt.key
+certfile $SNAP_COMMON/srv/certs/mqtt.crt
+EOF
+

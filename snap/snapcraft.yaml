@@ -1,0 +1,128 @@
+name: iot-management
+base: core22
+version: '0.1'
+summary: IoT device management suite in a snap!
+description: |
+  Why use K8S when you can snap?
+
+grade: devel
+confinement: devmode
+
+parts:
+  iot-management:
+    plugin: go
+    source: https://github.com/canonical/iot-management.git
+    source-depth: 1
+    build-snaps:
+      - go
+  iot-management-webapp:
+    plugin: nil
+    source: https://github.com/canonical/iot-management.git
+    source-depth: 1
+    build-snaps:
+      - node/18/stable
+    build-environment:
+      - NODE_OPTIONS: --openssl-legacy-provider
+    override-build: |
+      cp -r $CRAFT_PART_SRC/webapp/* $CRAFT_PART_BUILD
+      cd $CRAFT_PART_BUILD
+      npm install
+      npm rebuild node-sass
+      npm run build
+      cp -r $CRAFT_PART_SRC/static $CRAFT_PART_INSTALL/static
+      cp -r $CRAFT_PART_BUILD/build/static/* $CRAFT_PART_INSTALL/static
+      cp -r $CRAFT_PART_BUILD/build/index.html $CRAFT_PART_INSTALL/static/app.html
+  iot-identity:
+    plugin: go
+    source: https://github.com/canonical/iot-identity.git
+    source-depth: 1
+    build-snaps:
+      - go
+  iot-devicetwin:
+    plugin: go
+    source: https://github.com/canonical/iot-devicetwin.git
+    source-depth: 1
+    build-snaps:
+      - go
+    override-build: |
+      craftctl default
+      cp $CRAFT_PART_SRC/gencerts.sh $CRAFT_PART_INSTALL/bin
+  mosquitto:
+    plugin: dump
+    source: mosquitto
+    stage-packages:
+      - mosquitto
+      - mosquitto-clients
+  scripts:
+    plugin: dump
+    source: scripts
+    organize:
+      start-devtwin: bin/start-devtwin
+      start-ident: bin/start-ident
+      start-mgmt: bin/start-mgmt
+
+apps:
+  createsuperuser:
+    command: bin/createsuperuser
+  devicetwin:
+    command: bin/start-devtwin
+    daemon: simple
+    install-mode: disable
+    plugs:
+      - network
+      - network-bind
+    environment:
+      DRIVER: postgres
+      DATASOURCE: dbname=devicetwin host=localhost user=postgres sslmode=disable
+      PORT: 8040
+      MQTTURL: localhost
+      MQTTPORT: 1883
+      CERTSDIR: $SNAP_COMMON/srv/certs
+      CONFIGDIR: $SNAP_COMMON/srv/config
+  identity:
+    command: bin/start-ident
+    daemon: simple
+    install-mode: disable
+    plugs:
+      - network
+      - network-bind
+    environment:
+      DRIVER: postgres
+      DATASOURCE: dbname=identity host=localhost user=postgres sslmode=disable
+      PORT: 8030
+      MQTTURL: localhost
+      MQTTPORT: 1883
+      CERTSDIR: $SNAP_COMMON/srv/certs
+      CONFIGDIR: $SNAP_COMMON/srv/config
+  management:
+    command: bin/start-mgmt
+    daemon: simple
+    install-mode: disable
+    plugs:
+      - network
+      - network-bind
+    environment:
+      DRIVER: postgres
+      DATASOURCE: dbname=management host=localhost user=postgres sslmode=disable
+      HOST: localhost:8010
+      SCHEME: http
+      DEVICETWINAPI: http://localhost:8040/v1/
+      STOREURL: https://api.snapcraft.io/api/v1/
+  mosquitto:
+    command: usr/sbin/mosquitto -c /etc/mosquitto/mosquitto.conf
+    daemon: notify
+    install-mode: disable
+    restart-condition: on-failure
+    plugs:
+      - daemon-notify
+      - network
+      - network-bind
+
+layout:
+  /var/lib/mosquitto:
+    symlink: $SNAP_COMMON/lib/mosquitto
+  /etc/mosquitto:
+    symlink: $SNAP_DATA/etc/mosquitto
+  /var/log/mosquitto:
+    symlink: $SNAP_COMMON/log/mosquitto
+

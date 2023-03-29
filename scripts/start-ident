@@ -1,0 +1,4 @@
+#!/bin/bash
+
+exec $SNAP/bin/identity -port $PORT -driver $DRIVER -datasource "${DATASOURCE}" -mqtturl $MQTTURL -mqttport $MQTTPORT -certsdir $CERTSDIR -configdir $CONFIGDIR
+
